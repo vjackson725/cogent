@@ -227,7 +227,7 @@ fun cogent_splits_tac ctxt kinding_thms =
 
 fun cogent_guided_ttsplits_tac ctxt sz script =
   let fun mktac i [] =
-            if i = sz then rtac @{thm ttsplit_innerI(5)} 1 else
+            if i = sz then rtac @{thm ttsplit_innerI(1)} 1 else
             rtac @{thm ttsplit_innerI(1)} 1 THEN mktac (i+1) []
         | mktac i ((n, tacs)::script') =
             if i = n
@@ -345,17 +345,17 @@ fun follow_tt (Const (@{const_name TyTrSplit}, _) $ sps $ x $ T1 $ y $ T2, ts) k
 
 fun ttsplit_inner (@{term "Some TSK_S"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(4)}, RTac p] @ [simp] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p] @ [simp] @ rest end
   | ttsplit_inner (@{term "Some TSK_L"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(3)}, RTac p] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p] @ rest end
   | ttsplit_inner (@{term "Some TSK_R :: type_split_op option"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(2)}, RTac p] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p] @ rest end
   | ttsplit_inner (@{term "None :: type_split_op option"} :: tsks) (NONE :: Gamma) = let
     val rest = ttsplit_inner tsks Gamma
   in [RTac @{thm ttsplit_innerI(1)}] @ rest end
-  | ttsplit_inner [] [] = [RTac @{thm ttsplit_innerI(6)}]
+  | ttsplit_inner [] [] = [RTac @{thm ttsplit_innerI(2)}]
   | ttsplit_inner tsks _ = raise TERM ("ttsplit_inner", tsks)
 
 fun ttsplit (Const (@{const_name TyTrSplit}, _) $ sps $ _ $ _ $ _ $ _, Gamma) = let
@@ -365,20 +365,20 @@ fun ttsplit (Const (@{const_name TyTrSplit}, _) $ sps $ _ $ _ $ _ $ _, Gamma) = 
 
 fun ttsplit_bang_inner (@{term "Some TSK_S"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_bang_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(4)}, RTac p, simp] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p, simp] @ rest end
   | ttsplit_bang_inner (@{term "Some TSK_L"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_bang_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(3)}, RTac p] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p] @ rest end
   | ttsplit_bang_inner (@{term "Some TSK_R :: type_split_op option"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_bang_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(2)}, RTac p] @ rest end
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p] @ rest end
   | ttsplit_bang_inner (@{term "None :: type_split_op option"} :: tsks) (NONE :: Gamma) = let
     val rest = ttsplit_bang_inner tsks Gamma
   in [RTac @{thm ttsplit_innerI(1)}] @ rest end
   | ttsplit_bang_inner (@{term "Some TSK_NS"} :: tsks) (SOME p :: Gamma) = let
     val rest = ttsplit_bang_inner tsks Gamma
-  in [RTac @{thm ttsplit_innerI(5)}, RTac p, simp] @ rest end
-  | ttsplit_bang_inner [] [] = [RTac @{thm ttsplit_innerI(6)}]
+  in [RTac @{thm ttsplit_innerI(1)}, RTac p, simp] @ rest end
+  | ttsplit_bang_inner [] [] = [RTac @{thm ttsplit_innerI(2)}]
   | ttsplit_bang_inner tsks _ = raise TERM ("ttsplit_bang_inner", tsks)
 
 fun ttsplit_bang (Const (@{const_name TyTrSplit}, _) $ sps $ _ $ _ $ _ $ _, Gamma) = let

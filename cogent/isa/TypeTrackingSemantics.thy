@@ -263,7 +263,8 @@ lemma ttsplitI:
 lemma ttsplit_innerI:
   "\<lbrakk> K T\<turnstile> s , x \<leadsto> a \<parallel> b ; ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a \<rbrakk>
     \<Longrightarrow> ttsplit_inner K (s # sps) (x # \<Gamma>a) (a # \<Gamma>1a) (b # \<Gamma>2a)"
-  by (clarsimp simp add: ttsplit_inner_Cons)
+  "ttsplit_inner K [] [] [] []"
+  by (clarsimp simp add: ttsplit_inner_Cons ttsplit_inner_def)+
 
 lemma ttsplit_imp_split:
   assumes "ttsplit K \<Gamma> sps xs \<Gamma>1 ys \<Gamma>2"
