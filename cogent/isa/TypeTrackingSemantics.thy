@@ -49,7 +49,7 @@ inductive tsk_split_comp :: "kind env \<Rightarrow> type_split_op option \<Right
           ("_ T\<turnstile> _ , _ \<leadsto> _ \<parallel> _" [30,0,0,20] 60) where
   none  : "K T\<turnstile> None , None \<leadsto> None \<parallel> None"
 | left  : "\<lbrakk> K \<turnstile> t wellformed \<rbrakk> \<Longrightarrow> K T\<turnstile> Some TSK_L , Some t \<leadsto> Some t \<parallel> None"
-| right : "\<lbrakk> K \<turnstile> t wellformed \<rbrakk> \<Longrightarrow> K T\<turnstile> Some TSK_R , Some t \<leadsto> None   \<parallel> (Some t)"
+| right : "\<lbrakk> K \<turnstile> t wellformed \<rbrakk> \<Longrightarrow> K T\<turnstile> Some TSK_R , Some t \<leadsto> None   \<parallel> Some t"
 | share : "\<lbrakk> K \<turnstile> t :\<kappa> {S}     \<rbrakk> \<Longrightarrow> K T\<turnstile> Some TSK_S , Some t \<leadsto> Some t \<parallel> Some t"
 | bang  : "\<lbrakk> K \<turnstile> t wellformed ; t' = bang t \<rbrakk> \<Longrightarrow> K T\<turnstile> Some TSK_NS , Some t \<leadsto> Some t' \<parallel> Some t"
 declare tsk_split_comp.intros[intro!]
@@ -85,7 +85,15 @@ lemma split_comp_by_split_tsk:
   using assms
   by (force elim!: split_comp.cases simp: kinding_def)
 
-lemma split_bang_comp_by_split_split_bang_tsk:
+lemma tsk_split_comp_not_ns_imp_split_comp:
+  assumes
+    "K T\<turnstile> s, x \<leadsto> x1 \<parallel> x2"
+    "s \<noteq> Some TSK_NS"
+  shows "K \<turnstile> x \<leadsto> x1 \<parallel> x2"
+  using assms
+  by (auto elim!: tsk_split_comp.cases simp: kinding_def intro: split_comp.intros)
+
+lemma split_comp_imp_tsk_split_comp_not_ns:
   assumes
     "K , b \<turnstile> x \<leadsto>b x1 \<parallel> x2"
   shows
@@ -184,7 +192,6 @@ lemmas ttsplit_inner_induct =
   list_all4_induct[where P="tsk_split_comp K"  for K, simplified ttsplit_inner_def[symmetric],
     consumes 1, case_names Nil Cons, induct set: list_all4]
 
-
 lemmas ttsplit_inner_iff =
   list_all4_iff[where P="tsk_split_comp K"  for K, simplified ttsplit_inner_def[symmetric]]
 
@@ -209,14 +216,40 @@ lemma ttsplit_inner_lengthD:
 
 definition ttsplit :: "kind env \<Rightarrow> tree_ctx \<Rightarrow> type_split_op option list
         \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> bool"
+  where
+  "ttsplit K p sps xs p1 ys p2 =
+    (let (Ta, \<Gamma>a) = p
+    in let (T1, \<Gamma>1) = p1
+    in let (T2, \<Gamma>2) = p2
+    in (list_all (\<lambda>s. s \<noteq> Some TSK_NS) sps) \<and>
+      (Ta = TyTrSplit sps xs T1 ys T2) \<and>
+      (\<exists>\<Gamma>1a \<Gamma>2a.
+        ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a \<and>
+        (\<Gamma>1 = xs @ \<Gamma>1a) \<and>
+        (\<Gamma>2 = ys @ \<Gamma>2a)))"
+
+
+definition ttsplit_triv :: "tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> bool"
 where
-  "ttsplit K \<Gamma> sps xs \<Gamma>1 ys \<Gamma>2 =
-    (\<exists>\<Gamma>a \<Gamma>1a \<Gamma>2a T1 T2.
-        \<Gamma> = (TyTrSplit sps xs T1 ys T2, \<Gamma>a)
-        \<and> \<Gamma>1 = (T1, xs @ \<Gamma>1a)
-        \<and> \<Gamma>2 = (T2, ys @ \<Gamma>2a)
-        \<and> list_all (\<lambda>s. s \<noteq> Some TSK_NS) sps
-        \<and> ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a)"
+  "ttsplit_triv \<Gamma> xs \<Gamma>1 ys \<Gamma>2 = (\<exists>ijs \<Gamma>1a \<Gamma>2a.
+    fst \<Gamma> = TyTrSplit ijs xs \<Gamma>1a ys \<Gamma>2a \<and> \<Gamma>1 = (\<Gamma>1a, xs @ snd \<Gamma>) \<and> \<Gamma>2 = (\<Gamma>2a, ys @ snd \<Gamma>))"
+
+(* TODO args are in a different order to ttsplit *)
+definition ttsplit_bang :: "nat set \<Rightarrow> type_split_op option list \<Rightarrow> kind env \<Rightarrow> tree_ctx
+        \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> bool"
+  where
+  "ttsplit_bang is sps K p xs p1 ys p2 =
+    (let (Ta, \<Gamma>a) = p
+    in let (T1, \<Gamma>1) = p1
+    in let (T2, \<Gamma>2) = p2
+    in (\<forall>i < length \<Gamma>a. (i \<in> is) = (sps ! i = Some TSK_NS)) \<and>
+      (Ta = TyTrSplit sps xs T1 ys T2) \<and>
+      (\<exists>\<Gamma>1a \<Gamma>2a.
+        ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a \<and>
+        (\<Gamma>1 = xs @ \<Gamma>1a) \<and>
+        (\<Gamma>2 = ys @ \<Gamma>2a)))"
+
+subsection {* Type Tracking Split *}
 
 lemma ttsplitI:
   assumes
@@ -227,18 +260,18 @@ lemma ttsplitI:
   shows "ttsplit K (TyTrSplit sps xs T1 ys T2, \<Gamma>a) sps xs (T1, xs') ys (T2, ys')"
   using assms by (simp add: ttsplit_def)
 
-(* TODO legacy, remove *)
 lemma ttsplit_innerI:
   "\<lbrakk> K T\<turnstile> s , x \<leadsto> a \<parallel> b ; ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a \<rbrakk>
     \<Longrightarrow> ttsplit_inner K (s # sps) (x # \<Gamma>a) (a # \<Gamma>1a) (b # \<Gamma>2a)"
   by (clarsimp simp add: ttsplit_inner_Cons)
 
 lemma ttsplit_imp_split:
-  assumes
-    "ttsplit K \<Gamma> sps xs \<Gamma>1 ys \<Gamma>2"
-  shows "\<exists>\<Gamma>1a \<Gamma>2a. split K (snd \<Gamma>) \<Gamma>1a \<Gamma>2a \<and> snd \<Gamma>1 = xs @ \<Gamma>1a \<and> snd \<Gamma>2 = ys @ \<Gamma>2a"
+  assumes "ttsplit K \<Gamma> sps xs \<Gamma>1 ys \<Gamma>2"
+  shows "\<exists>\<Gamma>1a \<Gamma>2a. (K \<turnstile> (snd \<Gamma>) \<leadsto> \<Gamma>1a | \<Gamma>2a) \<and> snd \<Gamma>1 = xs @ \<Gamma>1a \<and> snd \<Gamma>2 = ys @ \<Gamma>2a"
   using assms
-  by (fastforce elim!: tsk_split_comp.cases intro: split_comp.intros
+  by (fastforce
+      elim!: tsk_split_comp.cases
+      intro: split_comp.intros tsk_split_comp_not_ns_imp_split_comp
       simp add: ttsplit_def ttsplit_inner_conv_all_nth split_conv_all_nth list_all_length)
 
 lemma split_imp_ttsplit:
@@ -253,23 +286,10 @@ lemma split_imp_ttsplit:
   by (clarsimp simp add: ttsplit_inner_conv_all_nth split_conv_all_nth list_all_length
       split_comp_by_split_tsk split_tsk_never_ns)
 
-definition ttsplit_triv :: "tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> ctx \<Rightarrow> tree_ctx \<Rightarrow> bool"
-where
-  "ttsplit_triv \<Gamma> xs \<Gamma>1 ys \<Gamma>2 = (\<exists>ijs \<Gamma>1a \<Gamma>2a.
-    fst \<Gamma> = TyTrSplit ijs xs \<Gamma>1a ys \<Gamma>2a \<and> \<Gamma>1 = (\<Gamma>1a, xs @ snd \<Gamma>) \<and> \<Gamma>2 = (\<Gamma>2a, ys @ snd \<Gamma>))"
 
 lemma ttsplit_trivI:
   "\<Gamma>1b = (\<Gamma>1a, xs @ \<Gamma>b) \<Longrightarrow> \<Gamma>2b = (\<Gamma>2a, ys @ \<Gamma>b) \<Longrightarrow> ttsplit_triv (TyTrSplit ijs xs \<Gamma>1a ys \<Gamma>2a, \<Gamma>b) xs \<Gamma>1b ys \<Gamma>2b"
   by (simp add: ttsplit_triv_def)
-
-(* TODO args are in a different order to ttsplit *)
-definition
-  "ttsplit_bang is sps K \<Gamma> xs \<Gamma>1 ys \<Gamma>2 =
-    (\<exists>\<Gamma>b \<Gamma>1a \<Gamma>2a T1 T2. \<Gamma> = (TyTrSplit sps xs T1 ys T2, \<Gamma>b)
-        \<and> ttsplit_inner K sps \<Gamma>b \<Gamma>1a \<Gamma>2a
-        \<and> (\<forall>i < length \<Gamma>b. (i \<in> is) = (sps ! i = Some TSK_NS))
-        \<and> \<Gamma>1 = (T1, xs @ \<Gamma>1a)
-        \<and> \<Gamma>2 = (T2, ys @ \<Gamma>2a))"
 
 lemma ttsplit_bang_imp_split_bang:
   "ttsplit_bang is sps K \<Gamma> xs \<Gamma>1 ys \<Gamma>2 \<Longrightarrow>
@@ -320,7 +340,7 @@ lemma split_bang_imp_ttsplit_bang:
   using assms
   unfolding ttsplit_bang_def
   by (auto dest: split_tsk_ns_imp_b simp add: ttsplit_inner_conv_all_nth split_bang_nth
-      split_bang_comp_by_split_split_bang_tsk split_bang_comp_with_true_forces_ns)
+      split_comp_imp_tsk_split_comp_not_ns split_bang_comp_with_true_forces_ns)
 
 lemma split_bang_imp_ttsplit:
   "split_bang K is \<Gamma> \<Gamma>1 \<Gamma>2
