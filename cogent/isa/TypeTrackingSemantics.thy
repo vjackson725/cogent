@@ -256,7 +256,7 @@ lemma ttsplitI:
     "ttsplit_inner K sps \<Gamma>a \<Gamma>1a \<Gamma>2a"
     "xs' = xs @ \<Gamma>1a"
     "ys' = ys @ \<Gamma>2a"
-    "list_all (\<lambda>s. s \<noteq> Some TSK_NS) sps = True"
+    "list_all (\<lambda>s. s \<noteq> Some TSK_NS) sps"
   shows "ttsplit K (TyTrSplit sps xs T1 ys T2, \<Gamma>a) sps xs (T1, xs') ys (T2, ys')"
   using assms by (simp add: ttsplit_def)
 
