@@ -376,46 +376,48 @@ where
                     \<rbrakk> \<Longrightarrow> \<Xi>, K, (tt, \<Gamma>) T\<turnstile> x : t"
 
 | ttyping_split  : "\<lbrakk> ttsplit K \<Gamma> ijs [] \<Gamma>1 [Some t, Some u] \<Gamma>2
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TProduct t u
-                   ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : t'
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Split x y : t'"
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TProduct t u
+                    ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : t'
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Split x y : t'"
 
 | ttyping_let    : "\<lbrakk> ttsplit K \<Gamma> ijs [] \<Gamma>1 [Some t] \<Gamma>2
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : t
-                   ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : u
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Let x y : u"
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : t
+                    ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : u
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Let x y : u"
 
 | ttyping_letb   : "\<lbrakk> ttsplit_bang is sps K \<Gamma> [] \<Gamma>1 [Some t] \<Gamma>2
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : t
-                   ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : u
-                   ; K \<turnstile> t :\<kappa> k
-                   ; E \<in> k
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> LetBang is x y : u"
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : t
+                    ; \<Xi>, K, \<Gamma>2 T\<turnstile> y : u
+                    ; K \<turnstile> t :\<kappa> k
+                    ; E \<in> k
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> LetBang is x y : u"
 
 | ttyping_case   : "\<lbrakk> ttsplit K \<Gamma> ijs [] \<Gamma>1 [] \<Gamma>2
-                   ; ttsplit_triv \<Gamma>2 [Some t] \<Gamma>3 [Some (TSum (tagged_list_update tag (t, Checked) ts))] \<Gamma>4
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TSum ts
-                   ; (tag, t, Unchecked) \<in> set ts
-                   ; \<Xi>, K, \<Gamma>3 T\<turnstile> a : u
-                   ; \<Xi>, K, \<Gamma>4 T\<turnstile> b : u
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Case x tag a b : u"
+                    \<comment> \<open> n.b. this typing rule has to go before anything that uses ts, so the tactic
+                         can work out what ts is \<close>
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TSum ts
+                    ; ttsplit_triv \<Gamma>2 [Some t] \<Gamma>3 [Some (TSum (tagged_list_update tag (t, Checked) ts))] \<Gamma>4
+                    ; (tag, t, Unchecked) \<in> set ts
+                    ; \<Xi>, K, \<Gamma>3 T\<turnstile> a : u
+                    ; \<Xi>, K, \<Gamma>4 T\<turnstile> b : u
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Case x tag a b : u"
 
 | ttyping_if     : "\<lbrakk> ttsplit K \<Gamma> ijs [] \<Gamma>1 [] \<Gamma>2
-                   ; ttsplit_triv \<Gamma>2 [] \<Gamma>3 [] \<Gamma>4
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TPrim Bool
-                   ; \<Xi>, K, \<Gamma>3 T\<turnstile> a : t
-                   ; \<Xi>, K, \<Gamma>4 T\<turnstile> b : t
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> If x a b : t"
+                    ; ttsplit_triv \<Gamma>2 [] \<Gamma>3 [] \<Gamma>4
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> x : TPrim Bool
+                    ; \<Xi>, K, \<Gamma>3 T\<turnstile> a : t
+                    ; \<Xi>, K, \<Gamma>4 T\<turnstile> b : t
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> If x a b : t"
 
 | ttyping_take   : "\<lbrakk> ttsplit K \<Gamma> ijs [] \<Gamma>1 [Some t, Some (TRecord (ts [f := (n, t, taken)]) s)] \<Gamma>2
-                   ; \<Xi>, K, \<Gamma>1 T\<turnstile> e : TRecord ts s
-                   ; sigil_perm s \<noteq> Some ReadOnly
-                   ; f < length ts
-                   ; ts ! f = (n, t, Present)
-                   ; K \<turnstile> t :\<kappa> k
-                   ; S \<in> k \<or> taken = Taken
-                   ; \<Xi>, K, \<Gamma>2 T\<turnstile> e' : u
-                   \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Take e f e' : u"
+                    ; \<Xi>, K, \<Gamma>1 T\<turnstile> e : TRecord ts s
+                    ; sigil_perm s \<noteq> Some ReadOnly
+                    ; f < length ts
+                    ; ts ! f = (n, t, Present)
+                    ; K \<turnstile> t :\<kappa> k
+                    ; S \<in> k \<or> taken = Taken
+                    ; \<Xi>, K, \<Gamma>2 T\<turnstile> e' : u
+                    \<rbrakk> \<Longrightarrow> \<Xi>, K, \<Gamma> T\<turnstile> Take e f e' : u"
 
 inductive_cases ttyping_splitE[elim]: "\<Xi>, K, \<Gamma> T\<turnstile> Split x y : t'"
 inductive_cases ttyping_letE[elim]: "\<Xi>, K, \<Gamma> T\<turnstile> Let x y : u"
@@ -429,21 +431,9 @@ assumes "\<Xi>, K, \<Gamma> T\<turnstile> e : u"
 shows   "\<Xi>, K, (snd \<Gamma>) \<turnstile> e : u"
   using assms
 proof (induct rule: ttyping.induct)
-  case (ttyping_case K t\<Gamma> ijs t\<Gamma>1 t\<Gamma>2 t t\<Gamma>3 tag ts t\<Gamma>4 \<Xi> x a u b)
-  then show ?case
-  proof (intro typing_typing_all.intros)
-    show "K \<turnstile> snd t\<Gamma> \<leadsto> snd t\<Gamma>1 | snd t\<Gamma>2"
-      using ttsplit_imp_split ttyping_case.hyps(1) by fastforce
-  next
-    show "\<Xi>, K, Some t # snd t\<Gamma>2 \<turnstile> a : u"
-      using ttsplit_triv_def ttyping_case.hyps(2,7) by auto
-  next
-    show "\<Xi>, K, Some (TSum (tagged_list_update tag (t, Checked) ts)) # snd t\<Gamma>2 \<turnstile> b : u"
-      using ttsplit_triv_def ttyping_case.hyps(2,9) by auto
-  qed simp+
 qed (auto simp: ttsplit_triv_def
          dest!: ttsplit_imp_split ttsplit_bang_imp_split_bang
-         intro: typing_typing_all.intros)
+         intro!: typing_typing_all.intros(2-))
 
 lemma typing_imp_ttyping_induct:
   shows "(\<Xi>, K, \<Gamma> \<turnstile> e : u \<Longrightarrow> (\<exists> tt. \<Xi>, K, (tt, \<Gamma>) T\<turnstile> e : u))"
@@ -694,7 +684,7 @@ next
   from u_sem_case_nm.prems(1)
   show ?case
   proof (cases rule: ttyping.cases)
-    case (ttyping_case ijs t\<Gamma>1 t\<Gamma>2 ta t\<Gamma>3 ts t\<Gamma>4)
+    case (ttyping_case ijs t\<Gamma>1 t\<Gamma>2 ts ta t\<Gamma>3 t\<Gamma>4)
 
     moreover have "[] \<turnstile> snd \<Gamma> \<leadsto> snd t\<Gamma>1 | snd t\<Gamma>2"
       using ttyping_case ttsplit_imp_split by fastforce
