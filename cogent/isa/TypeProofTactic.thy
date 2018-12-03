@@ -161,32 +161,28 @@ fun cterm_simplify ctxt (t : cterm) : cterm = t
   |> snd
   |> Thm.cterm_of ctxt;
 
-datatype goal_type = TTyping | Typing | Simp of thm list | TTSplit | TTSplitInner
+datatype goal_type = Simp of thm list | Resolve of thm list
 
-fun goal_type_of_term @{term_pat "TypeTrackingSemantics.ttyping _ _ _ _ _"} = SOME TTyping
-  | goal_type_of_term @{term_pat "Cogent.typing _ _ _ _ _"}               = SOME Typing
-  | goal_type_of_term @{term_pat "Cogent.kinding _ _ _"}                  = SOME (Simp @{thms kinding_defs})
-  | goal_type_of_term @{term_pat "\<not> composite_anormal_expr _"}            = SOME (Simp @{thms composite_anormal_expr_def})
-  | goal_type_of_term @{term_pat "ttsplit _ _ _ _ _ _ _"}                 = SOME TTSplit
-  | goal_type_of_term @{term_pat "ttsplit_inner _ _ _ _ _"}               = SOME TTSplitInner
-  | goal_type_of_term @{term_pat "weakening _ _ _"}                       = SOME (Simp @{thms weakening_def weakening_comp.simps Cogent.empty_def})
-  | goal_type_of_term @{term_pat "tsk_split_comp _ _ _ _ _"}              = SOME (Simp @{thms tsk_split_comp.simps})
-  | goal_type_of_term @{term_pat "ttsplit_triv _ _ _ _ _"}                = SOME (Simp @{thms ttsplit_triv_def})
-  | goal_type_of_term _                                                   = NONE
+fun goal_type_of_term @{term_pat "TypeTrackingSemantics.ttyping _ _ _ _ _"} =
+  SOME (Resolve @{thms ttyping.intros(2-) ttyping.intros(1)})
+  (* try the default case second, as it resolves with every ttyping (but won't complete most of the time) *)
+| goal_type_of_term @{term_pat "Cogent.typing _ _ _ _ _"}               = SOME (Resolve @{thms typing_typing_all.intros})
+| goal_type_of_term @{term_pat "ttsplit _ _ _ _ _ _ _"}                 = SOME (Resolve @{thms ttsplitI})
+| goal_type_of_term @{term_pat "ttsplit_inner _ _ _ _ _"}               = SOME (Resolve @{thms ttsplit_innerI})
+| goal_type_of_term @{term_pat "HOL.Ex _"}                              = SOME (Resolve @{thms exI})
+| goal_type_of_term @{term_pat "_ \<and> _"}                                 = SOME (Resolve @{thms conjI})
+| goal_type_of_term @{term_pat "Cogent.kinding _ _ _"}                  = SOME (Simp @{thms kinding_defs})
+| goal_type_of_term @{term_pat "\<not> composite_anormal_expr _"}            = SOME (Simp @{thms composite_anormal_expr_def})
+| goal_type_of_term @{term_pat "weakening _ _ _"}                       = SOME (Simp @{thms weakening_def weakening_comp.simps Cogent.empty_def})
+| goal_type_of_term @{term_pat "tsk_split_comp _ _ _ _ _"}              = SOME (Simp @{thms tsk_split_comp.simps})
+| goal_type_of_term @{term_pat "ttsplit_triv _ _ _ _ _"}                = SOME (Simp @{thms ttsplit_triv_def})
+| goal_type_of_term @{term_pat "_ = _"}                                 = SOME (Simp [])
+| goal_type_of_term @{term_pat "_ < _"}                                 = SOME (Simp [])
+| goal_type_of_term _                                                   = NONE
 
-fun tactic_of_goal_type ctxt TTyping =
-  ((resolve_tac ctxt @{thms ttyping.intros(2-)} 1) ORELSE
-  (resolve_tac ctxt @{thms ttyping.intros(1)} 1)) (* try the default case second, as it resolves with every ttyping (but won't complete most of the time) *)
-| tactic_of_goal_type ctxt Typing = (resolve_tac ctxt @{thms typing_typing_all.intros} 1)
+fun tactic_of_goal_type ctxt (Resolve thms) = resolve_tac ctxt thms 1 
 | tactic_of_goal_type ctxt (Simp thms) =
   CHANGED (Simplifier.asm_full_simp_tac (fold Simplifier.add_simp thms ctxt) 1)
-| tactic_of_goal_type ctxt TTSplit = (resolve_tac ctxt @{thms ttsplitI} 1)
-| tactic_of_goal_type ctxt TTSplitInner = (resolve_tac ctxt @{thms ttsplit_innerI} 1)
-
-*}
-
-ML_val {*
-
 *}
 
 declare [[ ML_debugger = true ]]
@@ -201,7 +197,22 @@ need this eventually for branching
   variables in the goal for future subgoals *)
 | ProofSubgoal of thm
 *)
-| ProofTodo of thm * proof_status tree list
+| ProofFailed of {
+  goal : thm, (* the overall goal of the current proof *)
+  failed : proof_status tree (* the subgoal which failed *)
+}
+| ProofUnexpectedTerm of thm
+
+fun strip_trueprop @{term_pat "HOL.Trueprop ?t"} = t
+| strip_trueprop _ = raise ERROR "strip_trueprop passed something which wasn't a Trueprop"
+
+(* take a goal, and try to solve the first hypothesis using simp *)
+fun quicksolve_goal ctxt goal =
+  if Thm.nprems_of goal = 0
+  then NONE
+  else (case Seq.pull (Simplifier.simp_tac ctxt 1 goal) of
+    SOME (goal, _) => SOME goal
+  | NONE => NONE)
 
 (* solve_typeproof takes a proposition term and solves it by recursively solving the term tree *)
 fun solve_typeproof ctxt (Const ("HOL.Trueprop", @{typ "bool \<Rightarrow> prop"}) $ t_rest) : proof_status tree =
@@ -217,37 +228,66 @@ fun solve_typeproof ctxt (Const ("HOL.Trueprop", @{typ "bool \<Rightarrow> prop"
           val goal' = (case Seq.pull results of
               SOME (goal, _) => goal
             | NONE => raise ERROR ("solve_typing_goal: failed on " ^ (@{make_string} (Thm.cterm_of ctxt t_start))))
-          val solved_prems = solve_typeproof_subgoals ctxt goal' []
           in
-            case fst solved_prems of
-              SOME thm => Tree { value = ProofDone thm, branches = snd solved_prems }
-            | NONE => Tree { value = ProofTodo (goal', snd solved_prems), branches = [] }
+            solve_typeproof_subgoals ctxt goal' []
           end
-      | NONE => Tree { value = ProofTodo (goal, []), branches = [] }
+      | NONE =>
+        (* we don't know what this is. It's probably an equality, so try to simplify it *)
+        (case Seq.pull (Simplifier.simp_tac ctxt 1 goal) of
+          SOME (goal, _) => Tree { value = ProofDone goal, branches = [] }
+        | NONE => Tree { value = ProofUnexpectedTerm goal, branches = [] })
   end
 | solve_typeproof _ _ = raise ERROR "solve_typeproof was not passed a Trueprop!"
 (* iteratively solve the subgoals, unifying as we go *)
-and solve_typeproof_subgoals ctxt goal (solved_subgoals_rev : proof_status tree list) : thm option * proof_status tree list = 
+and solve_typeproof_subgoals ctxt goal (solved_subgoals_rev : proof_status tree list) : proof_status tree = 
   case Thm.prems_of goal of
     (t_subgoal :: _) =>
-      (* TODO branching *)
-      (case tree_value (solve_typeproof ctxt t_subgoal) of
-        (ProofDone thm_subgoal) =>
-          let
-            (* resolve solution to subgoal with goal to make the goal smaller *)
-            val goal' =
-              case Seq.pull (resolve_tac ctxt [thm_subgoal] 1 goal) of
-                SOME (thm_soln, _) => thm_soln
-              | NONE =>  (* this shouldn't happen! *)
-                raise ERROR ("failed to unify subgoal (" ^ @{make_string} goal ^ ") with solved subgoal: " ^ (@{make_string} thm_subgoal))
-          in
-            solve_typeproof_subgoals ctxt goal' solved_subgoals_rev
-          end
-      | (ProofTodo (thm, subgoals)) =>
-        (NONE, rev (Tree { value = ProofTodo (thm, subgoals), branches = [] } :: solved_subgoals_rev))
-      )
+      (case goal_type_of_term (strip_trueprop t_subgoal) of
+        SOME (Simp thms) =>
+        let
+          (* This should always eliminate the premise *)
+          (* TODO error if this doesn't eliminate the premise *)
+          val simpgoals = CHANGED (Simplifier.asm_full_simp_tac (fold Simplifier.add_simp thms ctxt) 1) goal
+          val goal' =
+            (case Seq.pull simpgoals of
+              SOME (goal', _) => goal'
+            | NONE => raise ERROR ("(solve_typeproof) failed to simplify subgoal: " ^ @{make_string} (Thm.cprem_of goal 1)))
+        in
+          solve_typeproof_subgoals ctxt goal' solved_subgoals_rev
+        end
+      | SOME (Resolve _) =>
+        (* TODO duplicates some of the work of solve_typeproof. Deduplicate *)
+        let
+          (* solve the subgoal *)
+          val solved_subgoal = solve_typeproof ctxt t_subgoal
+        in
+          (case tree_value solved_subgoal of
+            ProofDone thm_subgoal =>
+              (* solved the subgoal, resolve it with the goal to make the goal smaller *)
+              let
+                (* resolve solution of the subgoal with the goal to make the goal smaller *)
+                val goal' =
+                  case Seq.pull (resolve_tac ctxt [thm_subgoal] 1 goal) of
+                    SOME (thm_soln, _) => thm_soln
+                  | NONE =>  (* this shouldn't happen! *)
+                    raise ERROR ("failed to unify subgoal (" ^ @{make_string} goal ^ ") with solved subgoal: " ^ (@{make_string} thm_subgoal))
+              in
+                solve_typeproof_subgoals ctxt goal' (solved_subgoal :: solved_subgoals_rev)
+              end
+          | _ =>
+            (* if the subgoal fails, the goal fails too *)
+            Tree { value = ProofFailed { goal = goal, failed = solved_subgoal }, branches = rev solved_subgoals_rev })
+        end
+      | NONE => raise ERROR ("Don't know what to do with: " ^ @{make_string} (Thm.cprem_of goal 1)))
   (* no more subgoals, we've solved the goal *)
-  | [] => (SOME (Goal.finish ctxt goal), rev solved_subgoals_rev)
+  | [] => Tree { value = ProofDone (Goal.finish ctxt goal), branches = rev solved_subgoals_rev }
+
+(* trace the last unsolved subgoal *)
+fun trace_typeproof (Tree { value = ProofFailed { goal = _, failed = failed_subgoal }, branches = _ }) =
+  trace_typeproof failed_subgoal
+| trace_typeproof (Tree { value = ProofUnexpectedTerm goal, branches = _ } : proof_status tree) =
+  (@{print tracing} goal ; ())
+| trace_typeproof (Tree { value = _, branches = _ } : proof_status tree) = ()
 *}
 
 ML {*
@@ -267,6 +307,8 @@ val t = Syntax.read_prop @{context}
           "            T\<turnstile> " ^ f ^ " : snd (snd " ^ f ^ "_type)")
 
 val proof_solver_tree = solve_typeproof simpctxt t;
+
+trace_typeproof proof_solver_tree
 *}
 
 ML_val {*
