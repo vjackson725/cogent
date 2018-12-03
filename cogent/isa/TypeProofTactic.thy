@@ -1,193 +1,54 @@
 theory TypeProofTactic
-  imports TypeTrackingSemantics CogentHelper Lib.TermPatternAntiquote Lib.Trace_Schematic_Insts
+  imports TypeTrackingSemantics CogentHelper Lib.TermPatternAntiquote
 begin
 
-definition
-  abbreviatedType1 :: " Cogent.type"
-where
-  "abbreviatedType1 \<equiv> TSum [(''A'', (TUnit, Unchecked)), (''B'', (TUnit, Unchecked))]"
-
-lemmas abbreviated_type_defs =
-  abbreviatedType1_def
-
-definition
-  foo_type :: " Cogent.kind list \<times>  Cogent.type \<times>  Cogent.type"
-where
-  "foo_type \<equiv> ([], (abbreviatedType1, abbreviatedType1))"
-
-definition
-  foo :: "string Cogent.expr"
-where
-  "foo \<equiv> Let (Var 0) (Case (Var 0) ''A'' (Let (Var 0) (Let Unit (Let (Con [(''A'', (TUnit, Unchecked)), (''B'', (TUnit, Checked))] ''A'' (Var 0)) (Var 0)))) (Let (Esac (Var 0)) (Let (Var 0) (Let Unit (Let (Con [(''A'', (TUnit, Checked)), (''B'', (TUnit, Unchecked))] ''B'' (Var 0)) (Var 0))))))"
-
 ML {*
-val Cogent_functions = ["foo"]
-val Cogent_abstract_functions = []
-*}
+datatype goal_type = Simp of thm list | Resolve of thm list | Force
 
-definition
-  \<Xi> :: " string \<Rightarrow>  Cogent.kind list \<times>  Cogent.type \<times>  Cogent.type"
-where
-  "\<Xi> \<equiv> (\<lambda>_.([], TUnit, TUnit))(''foo'' := foo_type)"
-
-definition
-  "\<xi> \<equiv> \<lambda>_. (\<lambda>_ _. False)"
-
-definition
-  "foo_typetree \<equiv> TyTrSplit (Cons (Some TSK_L) []) [] TyTrLeaf [Some abbreviatedType1] (TyTrSplit (Cons (Some TSK_L) (Cons None [])) [] TyTrLeaf [] (TyTrSplit (append (replicate 2 None) []) [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 2 None) [])) [] TyTrLeaf [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 3 None) [])) [] TyTrLeaf [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 4 None) [])) [] TyTrLeaf [Some (TSum [(''A'', (TUnit, Unchecked)), (''B'', (TUnit, Checked))])] TyTrLeaf))) [Some (TSum [(''A'', (TUnit, Checked)), (''B'', (TUnit, Unchecked))])] (TyTrSplit (Cons (Some TSK_L) (append (replicate 2 None) [])) [] TyTrLeaf [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 3 None) [])) [] TyTrLeaf [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 4 None) [])) [] TyTrLeaf [Some TUnit] (TyTrSplit (Cons (Some TSK_L) (append (replicate 5 None) [])) [] TyTrLeaf [Some (TSum [(''A'', (TUnit, Checked)), (''B'', (TUnit, Unchecked))])] TyTrLeaf))))))"
-
-
-ML {* open TTyping_Tactics *}
-
-ML_quiet {*
-val typing_helper_1_script : tac list = [
-(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[]))
-] *}
-
-
-lemma typing_helper_1[unfolded abbreviated_type_defs] :
-  "kinding [] abbreviatedType1 {E, S, D}"
-  apply (unfold abbreviated_type_defs)?
-  apply (tactic {* map (fn t => DETERM (interpret_tac t @{context} 1)) typing_helper_1_script |> EVERY *})
-  done
-
-ML_quiet {*
-val typing_helper_2_script : tac list = [
-(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[]))
-] *}
-
-
-lemma typing_helper_2[unfolded abbreviated_type_defs] :
-  "kinding [] TUnit {E, S, D}"
-  apply (unfold abbreviated_type_defs)?
-  apply (tactic {* map (fn t => DETERM (interpret_tac t @{context} 1)) typing_helper_2_script |> EVERY *})
-  done
-
-ML_quiet {*
-val typing_helper_3_script : tac list = [
-(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[]))
-] *}
-
-
-lemma typing_helper_3[unfolded abbreviated_type_defs] :
-  "kinding [] (TSum [(''A'', (TUnit, Checked)), (''B'', (TUnit, Unchecked))]) {E, S, D}"
-  apply (unfold abbreviated_type_defs)?
-  apply (tactic {* map (fn t => DETERM (interpret_tac t @{context} 1)) typing_helper_3_script |> EVERY *})
-  done
-
-ML_quiet {*
-val typing_helper_4_script : tac list = [
-(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[]))
-] *}
-
-
-lemma typing_helper_4[unfolded abbreviated_type_defs] :
-  "kinding [] (TSum [(''A'', (TUnit, Unchecked)), (''B'', (TUnit, Checked))]) {E, S, D}"
-  apply (unfold abbreviated_type_defs)?
-  apply (tactic {* map (fn t => DETERM (interpret_tac t @{context} 1)) typing_helper_4_script |> EVERY *})
-  done
-
-ML_quiet {*
-val foo_typecorrect_script : hints treestep list = [
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_1})]),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_1})]),
-StepUp,
-Val (TypingTacs []),
-StepDown,
-Val (TypingTacs []),
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-Val (KindingTacs [(RTac @{thm typing_helper_3})]),
-StepUp,
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-StepUp,
-Val (TypingTacs []),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-StepUp,
-Val (TypingTacs [(RTac @{thm typing_unit}),(SimpTac ([@{thm empty_def}],[])),(WeakeningTac [@{thm typing_helper_2}])]),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_4})]),
-StepUp,
-Val (TypingTacs [(RTac @{thm typing_con}),(RTac @{thm typing_var}),(SimpTac ([@{thm empty_def}],[])),(WeakeningTac [@{thm typing_helper_2}]),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[])),(RTac @{thm exI[where x = "{E,S,D}"]}),(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[])),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[]))]),
-Val (TypingTacs []),
-StepUp,
-StepUp,
-StepUp,
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-StepUp,
-Val (TypingTacs [(RTac @{thm typing_esac}),(RTac @{thm typing_var}),(SimpTac ([@{thm empty_def}],[])),(WeakeningTac [@{thm typing_helper_3}]),(SimpTac ([],[])),(SimpTac ([],[]))]),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-StepUp,
-Val (TypingTacs []),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_2})]),
-StepUp,
-Val (TypingTacs [(RTac @{thm typing_unit}),(SimpTac ([@{thm empty_def}],[])),(WeakeningTac [@{thm typing_helper_2}])]),
-StepDown,
-StepDown,
-Val (KindingTacs [(RTac @{thm typing_helper_3})]),
-StepUp,
-Val (TypingTacs [(RTac @{thm typing_con}),(RTac @{thm typing_var}),(SimpTac ([@{thm empty_def}],[])),(WeakeningTac [@{thm typing_helper_2}]),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[])),(RTac @{thm exI[where x = "{E,S,D}"]}),(SimpTac ([@{thm kinding_def},@{thm kinding_all_def},@{thm kinding_variant_def},@{thm kinding_record_def}],[])),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[])),(SimpTac ([],[]))]),
-Val (TypingTacs []),
-StepUp,
-StepUp,
-StepUp,
-StepUp,
-StepUp,
-StepUp,
-StepUp
-] *}
-
-
-ML {*
-
-fun cterm_simplify ctxt (t : cterm) : cterm = t
-  |> Simplifier.rewrite ctxt
-  |> Thm.concl_of
-  |> Logic.dest_equals
-  |> snd
-  |> Thm.cterm_of ctxt;
-
-datatype goal_type = Simp of thm list | Resolve of thm list
-
+(* TODO the fact we need to specify all the possible misc goal patterns is a bit of a mess.
+  Maybe just default to force with an expanded simpset + timeout when we don't know what to do?
+  (and log it?)
+  ~ v.jackson / 2018.12.04 *)
 fun goal_type_of_term @{term_pat "TypeTrackingSemantics.ttyping _ _ _ _ _"} =
   SOME (Resolve @{thms ttyping.intros(2-) ttyping.intros(1)})
   (* try the default case second, as it resolves with every ttyping (but won't complete most of the time) *)
 | goal_type_of_term @{term_pat "Cogent.typing _ _ _ _ _"}               = SOME (Resolve @{thms typing_typing_all.intros})
 | goal_type_of_term @{term_pat "ttsplit _ _ _ _ _ _ _"}                 = SOME (Resolve @{thms ttsplitI})
 | goal_type_of_term @{term_pat "ttsplit_inner _ _ _ _ _"}               = SOME (Resolve @{thms ttsplit_innerI})
-| goal_type_of_term @{term_pat "HOL.Ex _"}                              = SOME (Resolve @{thms exI})
-| goal_type_of_term @{term_pat "_ \<and> _"}                                 = SOME (Resolve @{thms conjI})
 | goal_type_of_term @{term_pat "Cogent.kinding _ _ _"}                  = SOME (Simp @{thms kinding_defs})
+| goal_type_of_term @{term_pat "ttsplit_triv _ _ _ _ _"}                = SOME (Simp @{thms ttsplit_triv_def})
 | goal_type_of_term @{term_pat "\<not> composite_anormal_expr _"}            = SOME (Simp @{thms composite_anormal_expr_def})
 | goal_type_of_term @{term_pat "weakening _ _ _"}                       = SOME (Simp @{thms weakening_def weakening_comp.simps Cogent.empty_def})
+| goal_type_of_term @{term_pat "is_consumed _ _"}                       = SOME (Simp @{thms weakening_def weakening_comp.simps Cogent.empty_def})
 | goal_type_of_term @{term_pat "tsk_split_comp _ _ _ _ _"}              = SOME (Simp @{thms tsk_split_comp.simps})
-| goal_type_of_term @{term_pat "ttsplit_triv _ _ _ _ _"}                = SOME (Simp @{thms ttsplit_triv_def})
-| goal_type_of_term @{term_pat "_ = _"}                                 = SOME (Simp [])
-| goal_type_of_term @{term_pat "_ < _"}                                 = SOME (Simp [])
+| goal_type_of_term @{term_pat "type_wellformed_pretty _ _"}            = SOME (Simp [])
+
+| goal_type_of_term @{term_pat "HOL.Ex _"}                              = SOME Force
+| goal_type_of_term @{term_pat "_ \<and> _"}                                 = SOME Force
+| goal_type_of_term @{term_pat "_ = _"}                                 = SOME Force
+| goal_type_of_term @{term_pat "_ < _"}                                 = SOME Force
+| goal_type_of_term @{term_pat "_ \<in> _"}                                 = SOME Force
+| goal_type_of_term @{term_pat "distinct _"}                            = SOME Force
+| goal_type_of_term @{term_pat "list_all _ _"}                          = SOME Force
+| goal_type_of_term @{term_pat "list_all2 _ _ _"}                       = SOME Force
 | goal_type_of_term _                                                   = NONE
+
 
 fun tactic_of_goal_type ctxt (Resolve thms) = resolve_tac ctxt thms 1 
 | tactic_of_goal_type ctxt (Simp thms) =
   CHANGED (Simplifier.asm_full_simp_tac (fold Simplifier.add_simp thms ctxt) 1)
+| tactic_of_goal_type ctxt (Force) =
+  force_tac ctxt 1
 *}
 
 declare [[ ML_debugger = true ]]
 
 ML {*
+
+(* TODO n.b. this approach only works because we never encounter a proof like
+  \<open>False \<Longrightarrow> False\<close> where we can't show the premise is true (and thus vacuous + removable).
+  I don't think we should encounter this, but make certain we don't.
+  ~ v.jackson / 2018.12.04 *)
 
 datatype proof_status =
   ProofDone of thm
@@ -218,7 +79,12 @@ fun quicksolve_goal ctxt goal =
 fun solve_typeproof ctxt (Const ("HOL.Trueprop", @{typ "bool \<Rightarrow> prop"}) $ t_rest) : proof_status tree =
   let
     val t_start = (Const ("HOL.Trueprop", @{typ "bool \<Rightarrow> prop"}) $ t_rest);
-    val goal = Thm.cterm_of ctxt t_start |> cterm_simplify ctxt |> Goal.init;
+    val goal =
+         Thm.cterm_of ctxt t_start
+      |> Goal.init
+      |> Simplifier.simp_tac ctxt 1
+      |> Seq.pull
+      |> (the #> fst);
   in
     case goal_type_of_term t_rest of
       SOME goal_type =>
@@ -247,9 +113,9 @@ and solve_typeproof_subgoals ctxt goal (solved_subgoals_rev : proof_status tree 
         let
           (* This should always eliminate the premise *)
           (* TODO error if this doesn't eliminate the premise *)
-          val simpgoals = CHANGED (Simplifier.asm_full_simp_tac (fold Simplifier.add_simp thms ctxt) 1) goal
+          val simp_solns = CHANGED (Simplifier.asm_full_simp_tac (fold Simplifier.add_simp thms ctxt) 1) goal
           val goal' =
-            (case Seq.pull simpgoals of
+            (case Seq.pull simp_solns of
               SOME (goal', _) => goal'
             | NONE => raise ERROR ("(solve_typeproof) failed to simplify subgoal: " ^ @{make_string} (Thm.cprem_of goal 1)))
         in
@@ -269,7 +135,7 @@ and solve_typeproof_subgoals ctxt goal (solved_subgoals_rev : proof_status tree 
                 val goal' =
                   case Seq.pull (resolve_tac ctxt [thm_subgoal] 1 goal) of
                     SOME (thm_soln, _) => thm_soln
-                  | NONE =>  (* this shouldn't happen! *)
+                  | NONE => (* this shouldn't happen! *)
                     raise ERROR ("failed to unify subgoal (" ^ @{make_string} goal ^ ") with solved subgoal: " ^ (@{make_string} thm_subgoal))
               in
                 solve_typeproof_subgoals ctxt goal' (solved_subgoal :: solved_subgoals_rev)
@@ -278,7 +144,20 @@ and solve_typeproof_subgoals ctxt goal (solved_subgoals_rev : proof_status tree 
             (* if the subgoal fails, the goal fails too *)
             Tree { value = ProofFailed { goal = goal, failed = solved_subgoal }, branches = rev solved_subgoals_rev })
         end
-      | NONE => raise ERROR ("Don't know what to do with: " ^ @{make_string} (Thm.cprem_of goal 1)))
+      | SOME (Force) =>
+        let
+          (* This should always eliminate the premise *)
+          (* TODO error if this doesn't eliminate the premise *)
+          val force_solns = force_tac (fold Simplifier.add_simp @{thms kinding_def} ctxt) 1 goal
+          val goal' =
+            (case Seq.pull force_solns of
+              SOME (goal', _) => goal'
+            | NONE => raise ERROR ("(solve_typeproof) failed to simplify subgoal: " ^ @{make_string} (Thm.cprem_of goal 1)))
+        in
+          solve_typeproof_subgoals ctxt goal' solved_subgoals_rev
+        end
+      | NONE => if strip_trueprop t_subgoal = @{term "HOL.False"} then raise ERROR ("Encountered unprovable goal: " ^ @{make_string} goal)
+                else raise ERROR ("Don't know what to do with: " ^ @{make_string} (Thm.cprem_of goal 1)))
   (* no more subgoals, we've solved the goal *)
   | [] => Tree { value = ProofDone (Goal.finish ctxt goal), branches = rev solved_subgoals_rev }
 
